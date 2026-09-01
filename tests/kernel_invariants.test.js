@@ -18,15 +18,15 @@ async function persistAdapterResult(db, executionId, result, adapter) {
 }
 
 test("all three source adapters emit the same semantic shape", async () => {
-  const common = { subjectId: "company-42", claimType: "status", value: "active" };
+  const common = { subject_id: "company-42", claim_type: "status", value: "active" };
   const web = await webAdapter.acquire({
-    html: `<div data-subject-id="${common.subjectId}" data-claim-type="${common.claimType}">${common.value}</div>`,
+    html: `<div data-subject-id="${common.subject_id}" data-claim-type="${common.claim_type}">${common.value}</div>`,
     sourceUri: "https://example.test/company-42"
   });
   const pdf = await pdfAdapter.acquire({
     text: common.value,
-    subjectId: common.subjectId,
-    claimType: common.claimType,
+    subjectId: common.subject_id,
+    claimType: common.claim_type,
     sourceUri: "file:///evidence/company-42.pdf"
   });
   const github = await githubAdapter.acquire({
@@ -57,7 +57,7 @@ test("same semantic content is stable and changed content is detectable", async 
   try {
     const webA = await webAdapter.acquire({ html: '<div data-subject-id="company-42" data-claim-type="status">active</div>' });
     const pdfA = await pdfAdapter.acquire({ text: "active", subjectId: "company-42", claimType: "status" });
-    const githubA = await githubAdapter.acquire({ response: { subjectId: "company-42", claimType: "status", value: "active" }, path: "company-42.json" });
+    const githubA = await githubAdapter.acquire({ response: { subject_id: "company-42", claim_type: "status", value: "active" }, path: "company-42.json" });
 
     const r1 = await persistAdapterResult(db, "web-exec", webA, webAdapter);
     const r2 = await persistAdapterResult(db, "pdf-exec", pdfA, pdfAdapter);
