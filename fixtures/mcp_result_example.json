@@ -1,0 +1,12 @@
+[
+{"id":"2607.23884","title":"A Comparative Study of MCP and A2A for Inter-Agent Coordination in LLM-Based Systems","url":"https://www.alphaxiv.org/abs/2607.23884","published":"2026-07-26","votes":0,"views":3},
+{"id":"2608.14613","title":"Do LLM Agents Negotiate Rationally? A Mechanism-Design Framework for Verifiable Multi-Agent Interaction over A2A/MCP","url":"https://www.alphaxiv.org/abs/2608.14613","published":"2026-07-10","votes":0,"views":0},
+{"id":"2606.31498","title":"Governance Gaps in Agent Interoperability Protocols: What MCP, A2A, and ACP Cannot Express","url":"https://www.alphaxiv.org/abs/2606.31498","published":"2026-06-30","votes":7,"views":56},
+{"id":"2606.03755","title":"LAP: An Agent-to-Instrument Protocol for Autonomous Science","url":"https://www.alphaxiv.org/abs/2606.03755","published":"2026-06-02","votes":6,"views":35},
+{"id":"2606.09751","title":"Collaborative Human-Agent Protocol (CHAP)","url":"https://www.alphaxiv.org/abs/2606.09751","published":"2026-06-08","votes":1,"views":6},
+{"id":"2606.00962","title":"SS-ZKR: Spatial-Semantic Zero-Knowledge Routing for Privacy-Preserving Multi-Agent Collaboration","url":"https://www.alphaxiv.org/abs/2606.00962","published":"2026-05-31","votes":3,"views":10},
+{"id":"2603.24775","title":"AIP: Agent Identity Protocol for Verifiable Delegation Across MCP and A2A","url":"https://www.alphaxiv.org/abs/2603.24775","published":"2026-03-25","votes":5,"views":75},
+{"id":"2604.15034","title":"Autogenesis: A Self-Evolving Agent Protocol","url":"https://www.alphaxiv.org/abs/2604.15034","published":"2026-04-16","votes":47,"views":776},
+{"id":"2505.02279","title":"A survey of agent interoperability protocols: Model Context Protocol (MCP), Agent Communication Protocol (ACP), Agent-to-Agent Protocol (A2A), and Agent Network Protocol (ANP)","url":"https://www.alphaxiv.org/abs/2505.02279","published":"2025-05-04","votes":131,"views":3283},
+{"id":"2606.19135","title":"A Technical Taxonomy of LLM Agent Communication Protocols","url":"https://www.alphaxiv.org/abs/2606.19135","published":"2026-06-17","votes":17,"views":130}
+]
