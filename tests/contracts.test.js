@@ -9,11 +9,12 @@ test("canonicalization is key-order independent", () => {
 
 test("evidence bundle separates execution, observation, evidence and verification", () => {
   const execution = createExecution({ executionId: "exec-1", source: "fixture", adapter: "dom" });
-  const observation = createObservation({ observationId: "obs-1", executionId: execution.execution_id, step: "row-1", data: { value: 42 } });
-  const evidence = createEvidence({ evidenceId: "ev-1", observation, sourceUri: "fixture://row-1", retrievalMethod: "dom-extraction" });
-  const verification = createVerification({ verificationId: "ver-1", evidenceId: evidence.evidence_id, method: "independent-readback", outcome: "pass" });
+  const observation = createObservation({ executionId: execution.execution_id, step: "row-1", data: { value: 42 } });
+  const evidence = createEvidence({ observation, sourceUri: "fixture://row-1", retrievalMethod: "dom-extraction" });
+  const verification = createVerification({ evidenceId: evidence.evidence_id, method: "independent-readback", outcome: "pass" });
 
   assert.equal(evidence.observation_id, observation.observation_id);
   assert.match(evidence.artifact_hash, /^sha256:[0-9a-f]{64}$/);
+  assert.match(evidence.evidence_id, /^ev:[0-9a-f]{64}$/);
   assert.equal(verification.evidence_id, evidence.evidence_id);
 });
