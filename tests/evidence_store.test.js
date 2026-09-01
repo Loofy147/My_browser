@@ -3,7 +3,7 @@ const {openEvidenceDB,persistRecord}=require("../src/evidence_store");
 
 test("evidence is content-addressed, immutable and idempotent",()=>{
  const db=openEvidenceDB();
- const base={executionId:"exec-1",source:"fixture",adapter:"dom",step:"row-1",sourceUri:"fixture://data_table",retrievalMethod:"table-extraction",verification:{verificationId:"ver-1",method:"independent-readback",outcome:"pass",verifier:"test"}};
+ const base={executionId:"exec-1",source:"fixture",adapter:"dom",step:"row-1",sourceUri:"fixture://data_table",retrievalMethod:"table-extraction",verification:{method:"independent-readback",outcome:"pass",verifier:"test"}};
 
  const first=persistRecord(db,{...base,data:{Name:"Item A",Score:"91"}});
  const second=persistRecord(db,{...base,data:{Name:"Item A",Score:"91"}});
