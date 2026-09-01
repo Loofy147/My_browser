@@ -119,6 +119,7 @@ function getArtifactHash(evidence) {
 
 module.exports = {
   SCHEMA_VERSION,
+  assertNonEmptyString,
   canonicalize,
   sha256Canonical,
   createExecution,
