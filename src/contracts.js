@@ -101,7 +101,9 @@ function createVerification({ evidenceId, method, outcome, verifiedAt = new Date
   if (!["pass", "fail", "inconclusive"].includes(outcome)) {
     throw new TypeError("outcome must be pass, fail, or inconclusive");
   }
-  const expectedId = "ver:" + sha256Canonical({ evidence_id: evidenceId, method, outcome, verified_at: verifiedAt, verifier });
+  // Verification identity represents the verification assertion, not the wall-clock time.
+  // Time remains recorded metadata, but repeating the same assertion is idempotent.
+  const expectedId = "ver:" + sha256Canonical({ evidence_id: evidenceId, method, outcome, verifier });
   if (verificationId !== undefined && verificationId !== expectedId) {
     throw new TypeError("verificationId does not match canonical verification identity");
   }
