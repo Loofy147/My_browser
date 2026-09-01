@@ -1,5 +1,5 @@
 const { openDB, allRuns } = require("./db");
-const { createExecution, createObservation, createEvidence, createVerification, sha256Canonical } = require("./contracts");
+const { createExecution, createObservation, createEvidence, createVerification, createProvenance, sha256Canonical } = require("./contracts");
 
 function ensureEvidenceSchema(db) {
   db.exec("PRAGMA foreign_keys = ON;");
@@ -8,7 +8,10 @@ function ensureEvidenceSchema(db) {
       execution_id TEXT PRIMARY KEY,
       source TEXT NOT NULL,
       adapter TEXT NOT NULL,
-      started_at TEXT NOT NULL
+      started_at TEXT NOT NULL,
+      request_id TEXT,
+      code_revision TEXT,
+      environment_digest TEXT
     );
     CREATE TABLE IF NOT EXISTS observations (
       observation_id TEXT PRIMARY KEY,
@@ -26,9 +29,11 @@ function ensureEvidenceSchema(db) {
       retrieval_method TEXT,
       artifact_hash TEXT NOT NULL,
       captured_at TEXT NOT NULL,
+      parent_evidence_id TEXT,
       UNIQUE(observation_id, artifact_hash),
       FOREIGN KEY (observation_id) REFERENCES observations(observation_id),
-      FOREIGN KEY (execution_id) REFERENCES executions(execution_id)
+      FOREIGN KEY (execution_id) REFERENCES executions(execution_id),
+      FOREIGN KEY (parent_evidence_id) REFERENCES evidence(evidence_id)
     );
     CREATE TABLE IF NOT EXISTS verifications (
       verification_id TEXT PRIMARY KEY,
@@ -38,6 +43,28 @@ function ensureEvidenceSchema(db) {
       verified_at TEXT NOT NULL,
       verifier TEXT NOT NULL,
       FOREIGN KEY (evidence_id) REFERENCES evidence(evidence_id)
+    );
+    CREATE TABLE IF NOT EXISTS evidence_provenance (
+      evidence_id TEXT PRIMARY KEY,
+      source_id TEXT NOT NULL,
+      source_uri TEXT,
+      retrieved_at TEXT NOT NULL,
+      adapter_id TEXT NOT NULL,
+      adapter_version TEXT NOT NULL,
+      code_revision TEXT,
+      environment_digest TEXT,
+      request_id TEXT,
+      raw_artifact_ref TEXT,
+      transform_id TEXT,
+      FOREIGN KEY (evidence_id) REFERENCES evidence(evidence_id)
+    );
+    CREATE TABLE IF NOT EXISTS evidence_relations (
+      evidence_id TEXT NOT NULL,
+      relation TEXT NOT NULL,
+      related_evidence_id TEXT NOT NULL,
+      PRIMARY KEY (evidence_id, relation, related_evidence_id),
+      FOREIGN KEY (evidence_id) REFERENCES evidence(evidence_id),
+      FOREIGN KEY (related_evidence_id) REFERENCES evidence(evidence_id)
     );
   `);
 }
@@ -54,34 +81,48 @@ function withTransaction(db, work) {
   }
 }
 
-function persistEvidenceBundle(db, { execution, observation, evidence, verification = null }) {
+function persistEvidenceBundle(db, { execution, observation, evidence, verification = null, provenance = null, relations = [] }) {
   if (execution.execution_id !== observation.execution_id || observation.observation_id !== evidence.observation_id || observation.execution_id !== evidence.execution_id) {
     throw new Error("Evidence bundle relationship invariants violated");
   }
   if (verification && verification.evidence_id !== evidence.evidence_id) {
     throw new Error("Verification must reference the persisted evidence");
   }
+  if (provenance && provenance.evidence_id !== evidence.evidence_id) {
+    throw new Error("Provenance must reference the persisted evidence");
+  }
 
   return withTransaction(db, () => {
-    db.prepare("INSERT OR IGNORE INTO executions(execution_id,source,adapter,started_at) VALUES(?,?,?,?)")
-      .run(execution.execution_id, execution.source, execution.adapter, execution.started_at);
+    db.prepare("INSERT OR IGNORE INTO executions(execution_id,source,adapter,started_at,request_id,code_revision,environment_digest) VALUES(?,?,?,?,?,?,?)")
+      .run(execution.execution_id, execution.source, execution.adapter, execution.started_at, execution.request_id, execution.code_revision, execution.environment_digest);
     db.prepare("INSERT OR IGNORE INTO observations(observation_id,execution_id,step,data,observed_at) VALUES(?,?,?,?,?)")
       .run(observation.observation_id, observation.execution_id, observation.step, JSON.stringify(observation.data), observation.observed_at);
-    db.prepare("INSERT OR IGNORE INTO evidence(evidence_id,observation_id,execution_id,source_uri,retrieval_method,artifact_hash,captured_at) VALUES(?,?,?,?,?,?,?)")
-      .run(evidence.evidence_id, evidence.observation_id, evidence.execution_id, evidence.source_uri, evidence.retrieval_method, evidence.artifact_hash, evidence.captured_at);
+    db.prepare("INSERT OR IGNORE INTO evidence(evidence_id,observation_id,execution_id,source_uri,retrieval_method,artifact_hash,captured_at,parent_evidence_id) VALUES(?,?,?,?,?,?,?,?)")
+      .run(evidence.evidence_id, evidence.observation_id, evidence.execution_id, evidence.source_uri, evidence.retrieval_method, evidence.artifact_hash, evidence.captured_at, evidence.parent_evidence_id);
+    if (provenance) {
+      db.prepare("INSERT OR IGNORE INTO evidence_provenance(evidence_id,source_id,source_uri,retrieved_at,adapter_id,adapter_version,code_revision,environment_digest,request_id,raw_artifact_ref,transform_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
+        .run(provenance.evidence_id, provenance.source_id, provenance.source_uri, provenance.retrieved_at, provenance.adapter_id, provenance.adapter_version, provenance.code_revision, provenance.environment_digest, provenance.request_id, provenance.raw_artifact_ref, provenance.transform_id);
+    }
     if (verification) {
       db.prepare("INSERT OR IGNORE INTO verifications(verification_id,evidence_id,method,outcome,verified_at,verifier) VALUES(?,?,?,?,?,?)")
         .run(verification.verification_id, verification.evidence_id, verification.method, verification.outcome, verification.verified_at, verification.verifier);
     }
-    return { execution, observation, evidence, verification };
+    for (const relation of relations) {
+      if (!relation || typeof relation !== "object") throw new TypeError("relation must be an object");
+      if (relation.evidenceId !== evidence.evidence_id) throw new Error("Relation source must be the persisted evidence");
+      if (!["supersedes", "derived_from", "same_subject", "supports", "contradicts"].includes(relation.relation)) throw new TypeError("unsupported evidence relation");
+      db.prepare("INSERT OR IGNORE INTO evidence_relations(evidence_id,relation,related_evidence_id) VALUES(?,?,?)")
+        .run(relation.evidenceId, relation.relation, relation.relatedEvidenceId);
+    }
+    return { execution, observation, evidence, verification, provenance, relations };
   });
 }
 
-function persistRecord(db, { executionId, source, adapter, step, data, sourceUri = null, retrievalMethod = null, verification = null, observedAt }) {
-  const execution = createExecution({ executionId, source, adapter, startedAt: observedAt });
+function persistRecord(db, { executionId, source, adapter, adapterVersion = "unknown", step, data, sourceUri = null, sourceId = source, retrievalMethod = null, verification = null, observedAt, requestId = null, codeRevision = null, environmentDigest = null, rawArtifactRef = null, transformId = null, parentEvidenceId = null, relations = [] }) {
+  const execution = createExecution({ executionId, source, adapter, startedAt: observedAt, requestId, codeRevision, environmentDigest });
   const artifactHash = sha256Canonical(data);
   const observation = createObservation({ executionId, step, data, observedAt });
-  const evidence = createEvidence({ observation, sourceUri, retrievalMethod });
+  const evidence = createEvidence({ observation, sourceUri, retrievalMethod, parentEvidenceId });
 
   let normalizedVerification = null;
   if (verification) {
@@ -95,10 +136,24 @@ function persistRecord(db, { executionId, source, adapter, step, data, sourceUri
     });
   }
 
+  const provenance = createProvenance({
+    evidenceId: evidence.evidence_id,
+    sourceId,
+    sourceUri,
+    retrievedAt: observedAt || evidence.captured_at,
+    adapterId: adapter,
+    adapterVersion,
+    codeRevision,
+    environmentDigest,
+    requestId,
+    rawArtifactRef,
+    transformId
+  });
+
   if (artifactHash !== evidence.artifact_hash.slice("sha256:".length)) {
     throw new Error("Evidence artifact hash mismatch");
   }
-  return persistEvidenceBundle(db, { execution, observation, evidence, verification: normalizedVerification });
+  return persistEvidenceBundle(db, { execution, observation, evidence, verification: normalizedVerification, provenance, relations });
 }
 
 function migrateLegacyRuns(db) {
