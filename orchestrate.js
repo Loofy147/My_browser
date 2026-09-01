@@ -25,7 +25,6 @@ function main(){
         sourceUri:"fixture://data_table.html",
         retrievalMethod:"table-extraction",
         verification:{
-          verificationId:"ver:orchestrated-dom:"+row.Name,
           method:"independent-fixture-readback",
           outcome:"pass",
           verifier:"pipeline-test"
