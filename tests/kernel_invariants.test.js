@@ -4,16 +4,18 @@ const { openEvidenceDB, persistRecord } = require("../src/evidence_store");
 const { sha256Canonical, createObservation, createEvidence } = require("../src/contracts");
 const { webAdapter, pdfAdapter, githubAdapter } = require("../src/source_adapters");
 
-async function persistAdapterResult(db, executionId, result, adapter) {
+async function persistAdapterResult(db, executionId, result, adapter, extra = {}) {
   return persistRecord(db, {
     executionId,
     source: result.source,
     adapter: adapter.id,
+    adapterVersion: adapter.version,
     step: result.step,
     data: result.data,
     sourceUri: result.source_uri,
     retrievalMethod: result.retrieval_method,
     observedAt: "2026-09-01T00:00:00.000Z",
+    ...extra,
   });
 }
 
@@ -68,15 +70,41 @@ test("same semantic content is stable and changed content is detectable", async 
     assert.notEqual(r1.evidence.evidence_id, r2.evidence.evidence_id, "execution context is part of evidence identity");
 
     const webChanged = await webAdapter.acquire({ html: '<div data-subject-id="company-42" data-claim-type="status">suspended</div>' });
-    const changed = await persistAdapterResult(db, "web-exec", webChanged, webAdapter);
+    const changed = await persistAdapterResult(db, "web-exec", webChanged, webAdapter, { parentEvidenceId: r1.evidence.evidence_id });
     assert.notEqual(changed.evidence.artifact_hash, r1.evidence.artifact_hash);
     assert.notEqual(changed.evidence.evidence_id, r1.evidence.evidence_id);
+
+    db.prepare("INSERT INTO evidence_relations(evidence_id,relation,related_evidence_id) VALUES(?,?,?)")
+      .run(changed.evidence.evidence_id, "supersedes", r1.evidence.evidence_id);
+    assert.equal(db.prepare("SELECT relation FROM evidence_relations WHERE evidence_id=?").get(changed.evidence.evidence_id).relation, "supersedes");
   } finally {
     db.close();
   }
 });
 
-test("foreign keys reject orphaned evidence", () => {
+test("provenance captures adapter identity and execution context", async () => {
+  const db = openEvidenceDB(":memory:");
+  try {
+    const web = await webAdapter.acquire({ html: '<div data-subject-id="company-42" data-claim-type="status">active</div>', sourceUri: "https://example.test/company-42" });
+    const result = await persistAdapterResult(db, "prov-exec", web, webAdapter, {
+      requestId: "req-42",
+      codeRevision: "git:abc123",
+      environmentDigest: "sha256:env",
+      rawArtifactRef: "artifact://raw/42",
+      transformId: "web-semantic-v1"
+    });
+    const row = db.prepare("SELECT * FROM evidence_provenance WHERE evidence_id=?").get(result.evidence.evidence_id);
+    assert.equal(row.adapter_id, webAdapter.id);
+    assert.equal(row.adapter_version, webAdapter.version);
+    assert.equal(row.request_id, "req-42");
+    assert.equal(row.raw_artifact_ref, "artifact://raw/42");
+    assert.equal(row.transform_id, "web-semantic-v1");
+  } finally {
+    db.close();
+  }
+});
+
+test("foreign keys reject orphaned observations", () => {
   const db = openEvidenceDB(":memory:");
   try {
     assert.throws(() => db.prepare("INSERT INTO observations(observation_id,execution_id,step,data,observed_at) VALUES(?,?,?,?,?)").run("orphan", "missing", "x", "{}", "2026-09-01T00:00:00.000Z"));
