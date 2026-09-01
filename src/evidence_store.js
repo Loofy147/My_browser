@@ -149,7 +149,7 @@ function persistRecord(db, { executionId, source, adapter, adapterVersion = "unk
       method: verification.method,
       outcome: verification.outcome,
       verifier: verification.verifier,
-      verifiedAt: verification.verifiedAt || observedAt
+      verifiedAt: verification.verifiedAt || evidence.captured_at
     });
   }
 
