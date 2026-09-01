@@ -1,5 +1,4 @@
 const fs=require("node:fs");
-const {recordStep}=require("./db");
 const {ensureEvidenceSchema,persistRecord}=require("./evidence_store");
 
 function ingestMCPResult(db,{runLabel,source,filePath,executionId=runLabel}){
@@ -12,19 +11,15 @@ function ingestMCPResult(db,{runLabel,source,filePath,executionId=runLabel}){
     const step=record.id||record.title;
     if(!step)throw new Error("Every MCP record needs an id or title");
 
-    const sourceUri=typeof record.url==="string"?record.url:null;
     persistRecord(db,{
       executionId,
       source,
       adapter:"mcp-json",
       step,
       data:record,
-      sourceUri,
-      retrievalMethod:"external-mcp-json",
+      sourceUri:typeof record.url==="string"?record.url:null,
+      retrievalMethod:"external-mcp-json"
     });
-
-    // Temporary compatibility projection for existing consumers.
-    recordStep(db,{runLabel,source,step,result:record,status:"ingested"});
   }
   return records.length;
 }
