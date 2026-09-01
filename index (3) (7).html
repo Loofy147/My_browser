@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Automation Toolkit Dashboard</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem; color: #1a1a1a; }
+  table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+  th, td { border: 1px solid #ddd; padding: 6px 10px; text-align: left; font-size: 14px; }
+  th { background: #f4f4f4; }
+  .status-success, .status-ingested { color: #1a7f37; }
+  .status-error { color: #cf222e; }
+  #summary { display: flex; gap: 2rem; margin-bottom: 1rem; }
+  .stat { background: #f6f8fa; padding: 0.75rem 1.25rem; border-radius: 6px; }
+  .stat .n { font-size: 1.5rem; font-weight: 600; }
+</style>
+</head>
+<body>
+  <h1>Automation Toolkit Dashboard</h1>
+  <div id="summary"></div>
+  <table id="runs-table">
+    <thead><tr><th>ID</th><th>Run</th><th>Source</th><th>Step</th><th>Status</th><th>Created</th></tr></thead>
+    <tbody id="runs-body"></tbody>
+  </table>
+
+  <script>
+    const RUNS = [{"id":1,"run_label":"orchestrated-run","source":"dom_automation:extractTable","step":"Item A","result":{"Name":"Item A","Score":"91","Status":"pass"},"status":"extracted","created_at":"2026-09-01 19:16:27"},{"id":2,"run_label":"orchestrated-run","source":"dom_automation:extractTable","step":"Item B","result":{"Name":"Item B","Score":"44","Status":"fail"},"status":"extracted","created_at":"2026-09-01 19:16:27"},{"id":3,"run_label":"orchestrated-run","source":"dom_automation:extractTable","step":"Item C","result":{"Name":"Item C","Score":"77","Status":"pass"},"status":"extracted","created_at":"2026-09-01 19:16:27"},{"id":4,"run_label":"orchestrated-run","source":"alphaXiv:discover_papers","step":"2607.23884","result":{"id":"2607.23884","title":"A Comparative Study of MCP and A2A for Inter-Agent Coordination in LLM-Based Systems","url":"https://www.alphaxiv.org/abs/2607.23884","published":"2026-07-26","votes":0,"views":3},"status":"ingested","created_at":"2026-09-01 19:16:27"},{"id":5,"run_label":"orchestrated-run","source":"alphaXiv:discover_papers","step":"2608.14613","result":{"id":"2608.14613","title":"Do LLM Agents Negotiate Rationally? A Mechanism-Design Framework for Verifiable Multi-Agent Interaction over A2A/MCP","url":"https://www.alphaxiv.org/abs/2608.14613","published":"2026-07-10","votes":0,"views":0},"status":"ingested","created_at":"2026-09-01 19:16:27"},{"id":6,"run_label":"orchestrated-run","source":"alphaXiv:discover_papers","step":"2606.31498","result":{"id":"2606.31498","title":"Governance Gaps in Agent Interoperability Protocols: What MCP, A2A, and ACP Cannot Express","url":"https://www.alphaxiv.org/abs/2606.31498","published":"2026-06-30","votes":7,"views":56},"status":"ingested","created_at":"2026-09-01 19:16:27"},{"id":7,"run_label":"orchestrated-run","source":"alphaXiv:discover_papers","step":"2606.03755","result":{"id":"2606.03755","title":"LAP: An Agent-to-Instrument Protocol for Autonomous Science","url":"https://www.alphaxiv.org/abs/2606.03755","published":"2026-06-02","votes":6,"views":35},"status":"ingested","created_at":"2026-09-01 19:16:27"},{"id":8,"run_label":"orchestrated-run","source":"alphaXiv:discover_papers","step":"2606.09751","result":{"id":"2606.09751","title":"Collaborative Human-Agent Protocol (CHAP)","url":"https://www.alphaxiv.org/abs/2606.09751","published":"2026-06-08","votes":1,"views":6},"status":"ingested","created_at":"2026-09-01 19:16:27"},{"id":9,"run_label":"orchestrated-run","source":"alphaXiv:discover_papers","step":"2606.00962","result":{"id":"2606.00962","title":"SS-ZKR: Spatial-Semantic Zero-Knowledge Routing for Privacy-Preserving Multi-Agent Collaboration","url":"https://www.alphaxiv.org/abs/2606.00962","published":"2026-05-31","votes":3,"views":10},"status":"ingested","created_at":"2026-09-01 19:16:27"},{"id":10,"run_label":"orchestrated-run","source":"alphaXiv:discover_papers","step":"2603.24775","result":{"id":"2603.24775","title":"AIP: Agent Identity Protocol for Verifiable Delegation Across MCP and A2A","url":"https://www.alphaxiv.org/abs/2603.24775","published":"2026-03-25","votes":5,"views":75},"status":"ingested","created_at":"2026-09-01 19:16:27"},{"id":11,"run_label":"orchestrated-run","source":"alphaXiv:discover_papers","step":"2604.15034","result":{"id":"2604.15034","title":"Autogenesis: A Self-Evolving Agent Protocol","url":"https://www.alphaxiv.org/abs/2604.15034","published":"2026-04-16","votes":47,"views":776},"status":"ingested","created_at":"2026-09-01 19:16:27"},{"id":12,"run_label":"orchestrated-run","source":"alphaXiv:discover_papers","step":"2505.02279","result":{"id":"2505.02279","title":"A survey of agent interoperability protocols: Model Context Protocol (MCP), Agent Communication Protocol (ACP), Agent-to-Agent Protocol (A2A), and Agent Network Protocol (ANP)","url":"https://www.alphaxiv.org/abs/2505.02279","published":"2025-05-04","votes":131,"views":3283,"affiliations":["Northeastern University","Kent State University","Cleveland State University","Youngstown State University"]},"status":"ingested","created_at":"2026-09-01 19:16:27"},{"id":13,"run_label":"orchestrated-run","source":"alphaXiv:discover_papers","step":"2606.19135","result":{"id":"2606.19135","title":"A Technical Taxonomy of LLM Agent Communication Protocols","url":"https://www.alphaxiv.org/abs/2606.19135","published":"2026-06-17","votes":17,"views":130},"status":"ingested","created_at":"2026-09-01 19:16:27"}];
+    const BY_SOURCE = {"dom_automation:extractTable":3,"alphaXiv:discover_papers":10};
+
+    const summary = document.getElementById('summary');
+    summary.innerHTML = `
+      <div class="stat"><div class="n">${RUNS.length}</div><div>total records</div></div>
+      <div class="stat"><div class="n">${Object.keys(BY_SOURCE).length}</div><div>sources</div></div>
+    `;
+
+    const body = document.getElementById('runs-body');
+    body.innerHTML = RUNS.map(r => `
+      <tr>
+        <td>${r.id}</td>
+        <td>${r.run_label}</td>
+        <td>${r.source}</td>
+        <td>${r.step}</td>
+        <td class="status-${r.status}">${r.status}</td>
+        <td>${r.created_at}</td>
+      </tr>
+    `).join('');
+  </script>
+</body>
+</html>
