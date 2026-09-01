@@ -1,5 +1,5 @@
 const { JSDOM } = require("jsdom");
-function loadHTML(html, options={}){return new JSDOM(html,{runScripts:"dangerously",resources:"usable",...options});}
+function loadHTML(html, options={}){const dom=new JSDOM(html,{runScripts:"dangerously",resources:"usable",...options});return dom.window.document;}
 function loadFile(filePath, options={}){const fs=require("node:fs");return loadHTML(fs.readFileSync(filePath,"utf8"),options);}
 function setValue(input,value){if(!input?.ownerDocument)throw new TypeError("input must be a DOM element");const proto=Object.getPrototypeOf(input);const d=Object.getOwnPropertyDescriptor(proto,"value");if(!d?.set)throw new TypeError("element does not expose a native value setter");d.set.call(input,value);input.dispatchEvent(new input.ownerDocument.defaultView.Event("input",{bubbles:true}));}
 function click(el){if(!el?.ownerDocument)throw new TypeError("element must belong to a document");el.dispatchEvent(new el.ownerDocument.defaultView.Event("click",{bubbles:true,cancelable:true}));}
