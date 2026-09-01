@@ -1,6 +1,16 @@
 const { openDB, allRuns } = require("./db");
 const { createExecution, createObservation, createEvidence, createVerification, createProvenance, sha256Canonical } = require("./contracts");
 
+function tableColumns(db, tableName) {
+  return new Set(db.prepare(`PRAGMA table_info(${tableName})`).all().map((row) => row.name));
+}
+
+function ensureColumn(db, tableName, columnName, definition) {
+  if (!tableColumns(db, tableName).has(columnName)) {
+    db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+  }
+}
+
 function ensureEvidenceSchema(db) {
   db.exec("PRAGMA foreign_keys = ON;");
   db.exec(`
@@ -8,10 +18,7 @@ function ensureEvidenceSchema(db) {
       execution_id TEXT PRIMARY KEY,
       source TEXT NOT NULL,
       adapter TEXT NOT NULL,
-      started_at TEXT NOT NULL,
-      request_id TEXT,
-      code_revision TEXT,
-      environment_digest TEXT
+      started_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS observations (
       observation_id TEXT PRIMARY KEY,
@@ -29,11 +36,9 @@ function ensureEvidenceSchema(db) {
       retrieval_method TEXT,
       artifact_hash TEXT NOT NULL,
       captured_at TEXT NOT NULL,
-      parent_evidence_id TEXT,
       UNIQUE(observation_id, artifact_hash),
       FOREIGN KEY (observation_id) REFERENCES observations(observation_id),
-      FOREIGN KEY (execution_id) REFERENCES executions(execution_id),
-      FOREIGN KEY (parent_evidence_id) REFERENCES evidence(evidence_id)
+      FOREIGN KEY (execution_id) REFERENCES executions(execution_id)
     );
     CREATE TABLE IF NOT EXISTS verifications (
       verification_id TEXT PRIMARY KEY,
@@ -66,7 +71,19 @@ function ensureEvidenceSchema(db) {
       FOREIGN KEY (evidence_id) REFERENCES evidence(evidence_id),
       FOREIGN KEY (related_evidence_id) REFERENCES evidence(evidence_id)
     );
+    CREATE TABLE IF NOT EXISTS schema_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
+
+  // Additive migrations for databases created before schema v3.
+  ensureColumn(db, "executions", "request_id", "TEXT");
+  ensureColumn(db, "executions", "code_revision", "TEXT");
+  ensureColumn(db, "executions", "environment_digest", "TEXT");
+  ensureColumn(db, "evidence", "parent_evidence_id", "TEXT");
+
+  db.prepare("INSERT OR REPLACE INTO schema_meta(key,value) VALUES('canonical_schema_version',?)").run("3");
 }
 
 function withTransaction(db, work) {
