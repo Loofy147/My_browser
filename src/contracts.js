@@ -1,6 +1,6 @@
 const crypto = require("node:crypto");
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 function assertNonEmptyString(value, name) {
   if (typeof value !== "string" || value.trim() === "") {
@@ -29,7 +29,7 @@ function sha256Canonical(value) {
   return crypto.createHash("sha256").update(canonicalize(value), "utf8").digest("hex");
 }
 
-function createExecution({ executionId, source, adapter, startedAt = new Date().toISOString() }) {
+function createExecution({ executionId, source, adapter, startedAt = new Date().toISOString(), requestId = null, codeRevision = null, environmentDigest = null }) {
   assertNonEmptyString(executionId, "executionId");
   assertNonEmptyString(source, "source");
   assertNonEmptyString(adapter, "adapter");
@@ -39,6 +39,9 @@ function createExecution({ executionId, source, adapter, startedAt = new Date().
     source,
     adapter,
     started_at: startedAt,
+    request_id: requestId,
+    code_revision: codeRevision,
+    environment_digest: environmentDigest,
   };
 }
 
@@ -60,7 +63,7 @@ function createObservation({ executionId, step, data, observedAt = new Date().to
   };
 }
 
-function createEvidence({ observation, sourceUri = null, retrievalMethod = null, evidenceId }) {
+function createEvidence({ observation, sourceUri = null, retrievalMethod = null, evidenceId, parentEvidenceId = null }) {
   if (!observation || typeof observation !== "object") {
     throw new TypeError("observation must be an object");
   }
@@ -88,6 +91,7 @@ function createEvidence({ observation, sourceUri = null, retrievalMethod = null,
     retrieval_method: retrievalMethod,
     artifact_hash: "sha256:" + artifactHash,
     captured_at: observation.observed_at,
+    parent_evidence_id: parentEvidenceId,
   };
 }
 
@@ -112,6 +116,28 @@ function createVerification({ evidenceId, method, outcome, verifiedAt = new Date
   };
 }
 
+function createProvenance({ evidenceId, sourceId, sourceUri = null, retrievedAt, adapterId, adapterVersion, codeRevision = null, environmentDigest = null, requestId = null, rawArtifactRef = null, transformId = null }) {
+  assertNonEmptyString(evidenceId, "evidenceId");
+  assertNonEmptyString(sourceId, "sourceId");
+  assertNonEmptyString(adapterId, "adapterId");
+  assertNonEmptyString(adapterVersion, "adapterVersion");
+  assertNonEmptyString(retrievedAt, "retrievedAt");
+  return {
+    schema_version: SCHEMA_VERSION,
+    evidence_id: evidenceId,
+    source_id: sourceId,
+    source_uri: sourceUri,
+    retrieved_at: retrievedAt,
+    adapter_id: adapterId,
+    adapter_version: adapterVersion,
+    code_revision: codeRevision,
+    environment_digest: environmentDigest,
+    request_id: requestId,
+    raw_artifact_ref: rawArtifactRef,
+    transform_id: transformId,
+  };
+}
+
 function getArtifactHash(evidence) {
   assertNonEmptyString(evidence.artifact_hash, "evidence.artifact_hash");
   return evidence.artifact_hash;
@@ -126,5 +152,6 @@ module.exports = {
   createObservation,
   createEvidence,
   createVerification,
+  createProvenance,
   getArtifactHash,
 };
