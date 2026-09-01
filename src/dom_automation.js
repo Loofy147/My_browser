@@ -1,0 +1,10 @@
+const { JSDOM } = require("jsdom");
+function loadHTML(html, options={}){return new JSDOM(html,{runScripts:"dangerously",resources:"usable",...options});}
+function loadFile(filePath, options={}){const fs=require("node:fs");return loadHTML(fs.readFileSync(filePath,"utf8"),options);}
+function setValue(input,value){if(!input?.ownerDocument)throw new TypeError("input must be a DOM element");const proto=Object.getPrototypeOf(input);const d=Object.getOwnPropertyDescriptor(proto,"value");if(!d?.set)throw new TypeError("element does not expose a native value setter");d.set.call(input,value);input.dispatchEvent(new input.ownerDocument.defaultView.Event("input",{bubbles:true}));}
+function click(el){if(!el?.ownerDocument)throw new TypeError("element must belong to a document");el.dispatchEvent(new el.ownerDocument.defaultView.Event("click",{bubbles:true,cancelable:true}));}
+function submitForm(form){if(!form?.ownerDocument)throw new TypeError("form must belong to a document");form.dispatchEvent(new form.ownerDocument.defaultView.Event("submit",{bubbles:true,cancelable:true}));}
+function text(document,selector){const el=document.querySelector(selector);return el?el.textContent:null;}
+function extractTable(document,selector){const table=document.querySelector(selector);if(!table)return[];const headers=Array.from(table.querySelectorAll("thead th")).map(x=>x.textContent.trim());return Array.from(table.querySelectorAll("tbody tr")).map(row=>{const cells=Array.from(row.querySelectorAll("td")).map(x=>x.textContent.trim());return Object.fromEntries(headers.map((h,i)=>[h,cells[i]??""]));});}
+function extractList(document,selector){return Array.from(document.querySelectorAll(selector+" li")).map(x=>x.textContent.trim());}
+module.exports={loadHTML,loadFile,setValue,click,submitForm,text,extractTable,extractList};
