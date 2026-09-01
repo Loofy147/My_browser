@@ -1,5 +1,5 @@
 const { openDB } = require("./db");
-const { createExecution, createObservation, createEvidence, createVerification } = require("./contracts");
+const { createExecution, createObservation, createEvidence, createVerification, sha256Canonical } = require("./contracts");
 
 function ensureEvidenceSchema(db) {
   db.exec(`
@@ -27,6 +27,7 @@ function ensureEvidenceSchema(db) {
       retrieval_method TEXT,
       artifact_hash TEXT NOT NULL,
       captured_at TEXT NOT NULL,
+      UNIQUE(observation_id, artifact_hash),
       FOREIGN KEY (observation_id) REFERENCES observations(observation_id),
       FOREIGN KEY (execution_id) REFERENCES executions(execution_id)
     );
@@ -43,76 +44,58 @@ function ensureEvidenceSchema(db) {
   `);
 }
 
-function openEvidenceDB(filePath = ":memory:") {
-  const db = openDB(filePath);
+function openEvidenceDB(filePath=":memory:") {
+  const db=openDB(filePath);
   ensureEvidenceSchema(db);
   return db;
 }
 
-function persistEvidenceBundle(db, { execution, observation, evidence, verification = null }) {
+function persistEvidenceBundle(db,{execution,observation,evidence,verification=null}) {
   db.exec("BEGIN");
   try {
     db.prepare("INSERT OR IGNORE INTO executions(execution_id,source,adapter,started_at) VALUES(?,?,?,?)")
-      .run(execution.execution_id, execution.source, execution.adapter, execution.started_at);
+      .run(execution.execution_id,execution.source,execution.adapter,execution.started_at);
 
     db.prepare("INSERT OR IGNORE INTO observations(observation_id,execution_id,step,data,observed_at) VALUES(?,?,?,?,?)")
-      .run(observation.observation_id, observation.execution_id, observation.step, JSON.stringify(observation.data), observation.observed_at);
+      .run(observation.observation_id,observation.execution_id,observation.step,JSON.stringify(observation.data),observation.observed_at);
 
     db.prepare("INSERT OR IGNORE INTO evidence(evidence_id,observation_id,execution_id,source_uri,retrieval_method,artifact_hash,captured_at) VALUES(?,?,?,?,?,?,?)")
-      .run(evidence.evidence_id, evidence.observation_id, evidence.execution_id, evidence.source_uri, evidence.retrieval_method, evidence.artifact_hash, evidence.captured_at);
+      .run(evidence.evidence_id,evidence.observation_id,evidence.execution_id,evidence.source_uri,evidence.retrieval_method,evidence.artifact_hash,evidence.captured_at);
 
-    if (verification) {
+    if(verification){
       db.prepare("INSERT OR IGNORE INTO verifications(verification_id,evidence_id,method,outcome,verified_at,verifier) VALUES(?,?,?,?,?,?)")
-        .run(verification.verification_id, verification.evidence_id, verification.method, verification.outcome, verification.verified_at, verification.verifier);
+        .run(verification.verification_id,verification.evidence_id,verification.method,verification.outcome,verification.verified_at,verification.verifier);
     }
-
     db.exec("COMMIT");
-  } catch (error) {
-    db.exec("ROLLBACK");
-    throw error;
-  }
+  }catch(error){db.exec("ROLLBACK");throw error;}
 }
 
-function persistRecord(db, { executionId, source, adapter, step, data, sourceUri = null, retrievalMethod = null, verification = null }) {
-  const execution = createExecution({ executionId, source, adapter });
-  const observation = createObservation({
-    observationId: executionId + ":" + step,
-    executionId,
-    step,
-    data,
+function persistRecord(db,{executionId,source,adapter,step,data,sourceUri=null,retrievalMethod=null,verification=null}) {
+  const execution=createExecution({executionId,source,adapter});
+  const artifactHash=sha256Canonical(data);
+  const observation=createObservation({
+    observationId:"obs:"+executionId+":"+step+":"+artifactHash,
+    executionId,step,data
   });
-  const evidence = createEvidence({
-    evidenceId: "ev:" + executionId + ":" + step,
-    observation,
-    sourceUri,
-    retrievalMethod,
+  const evidence=createEvidence({
+    evidenceId:"ev:"+executionId+":"+step+":"+artifactHash,
+    observation,sourceUri,retrievalMethod
   });
 
-  let normalizedVerification = null;
-  if (verification) {
-    normalizedVerification = createVerification({
-      verificationId: verification.verificationId,
-      evidenceId: evidence.evidence_id,
-      method: verification.method,
-      outcome: verification.outcome,
-      verifier: verification.verifier,
-      verifiedAt: verification.verifiedAt,
+  let normalizedVerification=null;
+  if(verification){
+    normalizedVerification=createVerification({
+      verificationId:verification.verificationId||"ver:"+evidence.evidence_id,
+      evidenceId:evidence.evidence_id,
+      method:verification.method,
+      outcome:verification.outcome,
+      verifier:verification.verifier,
+      verifiedAt:verification.verifiedAt
     });
   }
 
-  persistEvidenceBundle(db, {
-    execution,
-    observation,
-    evidence,
-    verification: normalizedVerification,
-  });
-
-  return { execution, observation, evidence, verification: normalizedVerification };
+  persistEvidenceBundle(db,{execution,observation,evidence,verification:normalizedVerification});
+  return {execution,observation,evidence,verification:normalizedVerification};
 }
 
-module.exports = {
-  openEvidenceDB,
-  ensureEvidenceSchema,
-  persistEvidenceBundle,
-  persistRecord,
-};
+module.exports={openEvidenceDB,ensureEvidenceSchema,persistEvidenceBundle,persistRecord};
