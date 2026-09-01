@@ -2,6 +2,7 @@ const { openDB, allRuns } = require("./db");
 const { createExecution, createObservation, createEvidence, createVerification, sha256Canonical } = require("./contracts");
 
 function ensureEvidenceSchema(db) {
+  db.exec("PRAGMA foreign_keys = ON;");
   db.exec(`
     CREATE TABLE IF NOT EXISTS executions (
       execution_id TEXT PRIMARY KEY,
@@ -41,73 +42,87 @@ function ensureEvidenceSchema(db) {
   `);
 }
 
-function persistEvidenceBundle(db,{execution,observation,evidence,verification=null}) {
+function withTransaction(db, work) {
   db.exec("BEGIN");
   try {
-    db.prepare("INSERT OR IGNORE INTO executions(execution_id,source,adapter,started_at) VALUES(?,?,?,?)")
-      .run(execution.execution_id,execution.source,execution.adapter,execution.started_at);
-    db.prepare("INSERT OR IGNORE INTO observations(observation_id,execution_id,step,data,observed_at) VALUES(?,?,?,?,?)")
-      .run(observation.observation_id,observation.execution_id,observation.step,JSON.stringify(observation.data),observation.observed_at);
-    db.prepare("INSERT OR IGNORE INTO evidence(evidence_id,observation_id,execution_id,source_uri,retrieval_method,artifact_hash,captured_at) VALUES(?,?,?,?,?,?,?)")
-      .run(evidence.evidence_id,evidence.observation_id,evidence.execution_id,evidence.source_uri,evidence.retrieval_method,evidence.artifact_hash,evidence.captured_at);
-    if(verification){
-      db.prepare("INSERT OR IGNORE INTO verifications(verification_id,evidence_id,method,outcome,verified_at,verifier) VALUES(?,?,?,?,?,?)")
-        .run(verification.verification_id,verification.evidence_id,verification.method,verification.outcome,verification.verified_at,verification.verifier);
-    }
+    const result = work();
     db.exec("COMMIT");
-  }catch(error){db.exec("ROLLBACK");throw error;}
+    return result;
+  } catch (error) {
+    try { db.exec("ROLLBACK"); } catch {}
+    throw error;
+  }
 }
 
-function persistRecord(db,{executionId,source,adapter,step,data,sourceUri=null,retrievalMethod=null,verification=null,observedAt}){
-  const execution=createExecution({executionId,source,adapter,startedAt:observedAt});
-  const artifactHash=sha256Canonical(data);
-  const observation=createObservation({
-    observationId:"obs:"+executionId+":"+step+":"+artifactHash,
-    executionId,step,data,observedAt
-  });
-  const evidence=createEvidence({
-    evidenceId:"ev:"+executionId+":"+step+":"+artifactHash,
-    observation,sourceUri,retrievalMethod
-  });
+function persistEvidenceBundle(db, { execution, observation, evidence, verification = null }) {
+  if (execution.execution_id !== observation.execution_id || observation.observation_id !== evidence.observation_id || observation.execution_id !== evidence.execution_id) {
+    throw new Error("Evidence bundle relationship invariants violated");
+  }
+  if (verification && verification.evidence_id !== evidence.evidence_id) {
+    throw new Error("Verification must reference the persisted evidence");
+  }
 
-  let normalizedVerification=null;
-  if(verification){
-    normalizedVerification=createVerification({
-      verificationId:verification.verificationId||"ver:"+evidence.evidence_id,
-      evidenceId:evidence.evidence_id,
-      method:verification.method,
-      outcome:verification.outcome,
-      verifier:verification.verifier,
-      verifiedAt:verification.verifiedAt||observedAt
+  return withTransaction(db, () => {
+    db.prepare("INSERT OR IGNORE INTO executions(execution_id,source,adapter,started_at) VALUES(?,?,?,?)")
+      .run(execution.execution_id, execution.source, execution.adapter, execution.started_at);
+    db.prepare("INSERT OR IGNORE INTO observations(observation_id,execution_id,step,data,observed_at) VALUES(?,?,?,?,?)")
+      .run(observation.observation_id, observation.execution_id, observation.step, JSON.stringify(observation.data), observation.observed_at);
+    db.prepare("INSERT OR IGNORE INTO evidence(evidence_id,observation_id,execution_id,source_uri,retrieval_method,artifact_hash,captured_at) VALUES(?,?,?,?,?,?,?)")
+      .run(evidence.evidence_id, evidence.observation_id, evidence.execution_id, evidence.source_uri, evidence.retrieval_method, evidence.artifact_hash, evidence.captured_at);
+    if (verification) {
+      db.prepare("INSERT OR IGNORE INTO verifications(verification_id,evidence_id,method,outcome,verified_at,verifier) VALUES(?,?,?,?,?,?)")
+        .run(verification.verification_id, verification.evidence_id, verification.method, verification.outcome, verification.verified_at, verification.verifier);
+    }
+    return { execution, observation, evidence, verification };
+  });
+}
+
+function persistRecord(db, { executionId, source, adapter, step, data, sourceUri = null, retrievalMethod = null, verification = null, observedAt }) {
+  const execution = createExecution({ executionId, source, adapter, startedAt: observedAt });
+  const artifactHash = sha256Canonical(data);
+  const observation = createObservation({ executionId, step, data, observedAt });
+  const evidence = createEvidence({ observation, sourceUri, retrievalMethod });
+
+  let normalizedVerification = null;
+  if (verification) {
+    normalizedVerification = createVerification({
+      verificationId: verification.verificationId,
+      evidenceId: evidence.evidence_id,
+      method: verification.method,
+      outcome: verification.outcome,
+      verifier: verification.verifier,
+      verifiedAt: verification.verifiedAt || observedAt
     });
   }
 
-  persistEvidenceBundle(db,{execution,observation,evidence,verification:normalizedVerification});
-  return {execution,observation,evidence,verification:normalizedVerification};
+  if (artifactHash !== evidence.artifact_hash.slice("sha256:".length)) {
+    throw new Error("Evidence artifact hash mismatch");
+  }
+  return persistEvidenceBundle(db, { execution, observation, evidence, verification: normalizedVerification });
 }
 
-function migrateLegacyRuns(db){
+function migrateLegacyRuns(db) {
   ensureEvidenceSchema(db);
-  const legacy=allRuns(db);
-  for(const row of legacy){
-    persistRecord(db,{
-      executionId:"legacy:"+row.run_label+":"+row.source,
-      source:row.source,
-      adapter:"legacy-db",
-      step:row.step,
-      data:row.result,
-      retrievalMethod:"legacy-migration",
-      observedAt:row.created_at ? new Date(row.created_at.replace(" ","T")+"Z").toISOString() : undefined
+  const legacy = allRuns(db);
+  for (const row of legacy) {
+    persistRecord(db, {
+      executionId: "legacy:" + row.run_label + ":" + row.source,
+      source: row.source,
+      adapter: "legacy-db",
+      step: row.step,
+      data: row.result,
+      retrievalMethod: "legacy-migration",
+      observedAt: row.created_at ? new Date(row.created_at.replace(" ", "T") + "Z").toISOString() : undefined
     });
   }
   return legacy.length;
 }
 
-function openEvidenceDB(filePath=":memory:"){
-  const db=openDB(filePath);
+function openEvidenceDB(filePath = ":memory:") {
+  const db = openDB(filePath);
   ensureEvidenceSchema(db);
   migrateLegacyRuns(db);
   return db;
 }
 
-module.exports={openEvidenceDB,ensureEvidenceSchema,persistEvidenceBundle,persistRecord,migrateLegacyRuns};
+module.exports = { openEvidenceDB, ensureEvidenceSchema, persistEvidenceBundle, persistRecord, migrateLegacyRuns };
