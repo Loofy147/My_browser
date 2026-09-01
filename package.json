@@ -1,0 +1,10 @@
+{
+  "name": "my-browser-automation-toolkit",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Small DOM automation, ingestion, persistence, and dashboard pipeline.",
+  "type": "commonjs",
+  "engines": { "node": ">=22.13.0" },
+  "scripts": { "test": "node --test", "start": "node orchestrate.js" },
+  "dependencies": { "jsdom": "30.0.1" }
+}
