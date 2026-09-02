@@ -65,6 +65,17 @@ function ensureEvidenceSchema(db) {
       transform_id TEXT,
       FOREIGN KEY (evidence_id) REFERENCES evidence(evidence_id)
     );
+    CREATE TABLE IF NOT EXISTS evidence_transforms (
+      transform_instance_id TEXT PRIMARY KEY,
+      transform_id TEXT NOT NULL,
+      transform_version TEXT NOT NULL,
+      input_artifact_ref TEXT,
+      output_evidence_id TEXT NOT NULL,
+      description TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (input_artifact_ref) REFERENCES raw_artifacts(artifact_ref),
+      FOREIGN KEY (output_evidence_id) REFERENCES evidence(evidence_id)
+    );
     CREATE TABLE IF NOT EXISTS evidence_relations (
       evidence_id TEXT NOT NULL,
       relation TEXT NOT NULL,
@@ -100,7 +111,7 @@ function withTransaction(db, work) {
   }
 }
 
-function persistEvidenceBundle(db, { execution, observation, evidence, verification = null, provenance = null, relations = [] }) {
+function persistEvidenceBundle(db, { execution, observation, evidence, verification = null, provenance = null, relations = [], transform = null }) {
   if (execution.execution_id !== observation.execution_id || observation.observation_id !== evidence.observation_id || observation.execution_id !== evidence.execution_id) {
     throw new Error("Evidence bundle relationship invariants violated");
   }
@@ -121,6 +132,10 @@ function persistEvidenceBundle(db, { execution, observation, evidence, verificat
     if (provenance) {
       db.prepare("INSERT OR IGNORE INTO evidence_provenance(evidence_id,source_id,source_uri,retrieved_at,adapter_id,adapter_version,code_revision,environment_digest,request_id,raw_artifact_ref,transform_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
         .run(provenance.evidence_id, provenance.source_id, provenance.source_uri, provenance.retrieved_at, provenance.adapter_id, provenance.adapter_version, provenance.code_revision, provenance.environment_digest, provenance.request_id, provenance.raw_artifact_ref, provenance.transform_id);
+    }
+    if (transform) {
+      db.prepare("INSERT OR IGNORE INTO evidence_transforms(transform_instance_id,transform_id,transform_version,input_artifact_ref,output_evidence_id,description,created_at) VALUES(?,?,?,?,?,?,?)")
+        .run(transform.transformInstanceId, transform.transformId, transform.transformVersion, transform.inputArtifactRef, evidence.evidence_id, transform.description, transform.createdAt);
     }
     if (verification) {
       db.prepare("INSERT OR IGNORE INTO verifications(verification_id,evidence_id,method,outcome,verified_at,verifier) VALUES(?,?,?,?,?,?)")
@@ -174,7 +189,15 @@ function persistRecord(db, { executionId, source, adapter, adapterVersion = "unk
   if (artifactHash !== evidence.artifact_hash.slice("sha256:".length)) {
     throw new Error("Evidence artifact hash mismatch");
   }
-  return persistEvidenceBundle(db, { execution, observation, evidence, verification: normalizedVerification, provenance, relations });
+  const transform = transformId ? {
+    transformInstanceId: "tx:" + evidence.evidence_id + ":" + transformId,
+    transformId,
+    transformVersion: adapterVersion,
+    inputArtifactRef: resolvedRawArtifactRef,
+    description: "normalization by " + adapter,
+    createdAt: observedAt || evidence.captured_at
+  } : null;
+  return persistEvidenceBundle(db, { execution, observation, evidence, verification: normalizedVerification, provenance, relations, transform });
 }
 
 function migrateLegacyRuns(db) {
