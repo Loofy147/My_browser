@@ -94,5 +94,8 @@ The hypothesis advances only when all of the following are demonstrated in autom
 8. Foreign-key violations fail closed.
 9. A replay can reconstruct the canonical evidence identity from the recorded observation.
 10. Provenance fields remain source-specific but contract-compatible.
+11. Raw artifacts are retained by content hash and remain byte-retrievable.
+12. Transformation lineage links raw inputs to normalized Evidence outputs.
+13. Replaying from the recorded normalized observation reconstructs the same Evidence identity.
 
 If the kernel cannot satisfy this gate without adding large source-specific exceptions, the abstraction should be considered failed or re-scoped.
