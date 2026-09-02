@@ -1,5 +1,6 @@
 const { openDB, allRuns } = require("./db");
 const { createExecution, createObservation, createEvidence, createVerification, createProvenance, sha256Canonical } = require("./contracts");
+const { ensureArtifactSchema, storeRawArtifact } = require("./artifact_store");
 
 function tableColumns(db, tableName) {
   return new Set(db.prepare(`PRAGMA table_info(${tableName})`).all().map((row) => row.name));
@@ -13,6 +14,7 @@ function ensureColumn(db, tableName, columnName, definition) {
 
 function ensureEvidenceSchema(db) {
   db.exec("PRAGMA foreign_keys = ON;");
+  ensureArtifactSchema(db);
   db.exec(`
     CREATE TABLE IF NOT EXISTS executions (
       execution_id TEXT PRIMARY KEY,
@@ -135,8 +137,9 @@ function persistEvidenceBundle(db, { execution, observation, evidence, verificat
   });
 }
 
-function persistRecord(db, { executionId, source, adapter, adapterVersion = "unknown", step, data, sourceUri = null, sourceId = source, retrievalMethod = null, verification = null, observedAt, requestId = null, codeRevision = null, environmentDigest = null, rawArtifactRef = null, transformId = null, parentEvidenceId = null, relations = [] }) {
+function persistRecord(db, { executionId, source, adapter, adapterVersion = "unknown", step, data, sourceUri = null, sourceId = source, retrievalMethod = null, verification = null, observedAt, requestId = null, codeRevision = null, environmentDigest = null, rawArtifactRef = null, rawArtifact = null, rawMediaType = "application/octet-stream", transformId = null, parentEvidenceId = null, relations = [] }) {
   const execution = createExecution({ executionId, source, adapter, startedAt: observedAt, requestId, codeRevision, environmentDigest });
+  const resolvedRawArtifactRef = rawArtifact === null ? rawArtifactRef : storeRawArtifact(db, { rawArtifact, mediaType: rawMediaType, capturedAt: observedAt || new Date().toISOString() });
   const artifactHash = sha256Canonical(data);
   const observation = createObservation({ executionId, step, data, observedAt });
   const evidence = createEvidence({ observation, sourceUri, retrievalMethod, parentEvidenceId });
@@ -163,10 +166,11 @@ function persistRecord(db, { executionId, source, adapter, adapterVersion = "unk
     codeRevision,
     environmentDigest,
     requestId,
-    rawArtifactRef,
+    rawArtifactRef: resolvedRawArtifactRef,
     transformId
   });
 
+  if (resolvedRawArtifactRef === null && rawArtifact !== null) throw new Error("raw artifact reference resolution failed");
   if (artifactHash !== evidence.artifact_hash.slice("sha256:".length)) {
     throw new Error("Evidence artifact hash mismatch");
   }
