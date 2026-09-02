@@ -19,11 +19,17 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
 
-      # package-lock.json is not committed yet. Generate it from the clean
-      # checkout, then require npm ci to consume exactly that resolved graph.
-      # This is intentionally not described as committed-lock reproducibility.
+      # The repository intentionally has no committed package-lock.json yet.
+      # Generate the lock from the clean manifest twice and require identical
+      # results before letting npm ci consume it. This is manifest-level
+      # reproducibility, not committed-lock reproducibility.
       - run: npm install --package-lock-only --ignore-scripts
+      - run: cp package-lock.json /tmp/package-lock.first.json
+      - run: rm package-lock.json
+      - run: npm install --package-lock-only --ignore-scripts
+      - run: cmp --silent /tmp/package-lock.first.json package-lock.json
       - run: npm ci --ignore-scripts
+
       - run: npm test
 
       # Running twice is an explicit idempotency check for the end-to-end writer.
@@ -31,4 +37,3 @@ jobs:
       - run: npm start
       - run: test -f dashboard/index.html
       - run: test -f data/toolkit.db
-      - run: git diff --exit-code -- package-lock.json
