@@ -24,10 +24,14 @@ function ensureArtifactSchema(db) {
   `);
 }
 
+function prepareRawArtifact(rawArtifact) {
+  const bytes = assertRawArtifact(rawArtifact);
+  return { bytes, artifactRef: sha256Bytes(bytes) };
+}
+
 function storeRawArtifact(db, { rawArtifact, mediaType = "application/octet-stream", capturedAt = new Date().toISOString() }) {
   ensureArtifactSchema(db);
-  const bytes = assertRawArtifact(rawArtifact);
-  const artifactRef = sha256Bytes(bytes);
+  const { bytes, artifactRef } = prepareRawArtifact(rawArtifact);
 
   db.prepare(`
     INSERT OR IGNORE INTO raw_artifacts(artifact_ref,content,media_type,byte_length,captured_at)
@@ -44,4 +48,4 @@ function getRawArtifact(db, artifactRef) {
   return row ?? null;
 }
 
-module.exports = { sha256Bytes, ensureArtifactSchema, storeRawArtifact, getRawArtifact };
+module.exports = { sha256Bytes, prepareRawArtifact, ensureArtifactSchema, storeRawArtifact, getRawArtifact };
