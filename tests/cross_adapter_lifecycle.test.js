@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 
 const { webAdapter, pdfAdapter, githubAdapter } = require("../src/source_adapters");
 const { openEvidenceDB, persistRecord } = require("../src/evidence_store");
-const { sha256Canonical } = require("../src/contracts");
+const { sha256Canonical, replayEvidenceIdentity } = require("../src/contracts");
 
 const observedAt = "2026-09-01T00:00:00.000Z";
 const semanticData = {
@@ -106,6 +106,7 @@ test("cross-adapter evidence lifecycle preserves semantic identity while separat
 
     assert.notEqual(mutatedBundle.evidence.artifact_hash, webBundle.evidence.artifact_hash);
     assert.notEqual(mutatedBundle.evidence.evidence_id, webBundle.evidence.evidence_id);
+    assert.equal(replayEvidenceIdentity({ executionId: "exec-web", step: web.step, data: web.data }), webBundle.evidence.evidence_id);
     assert.equal(db.prepare("SELECT count(*) AS n FROM verifications WHERE evidence_id = ?").get(mutatedBundle.evidence.evidence_id).n, 0);
 
     const originalRow = db.prepare("SELECT artifact_hash, source_uri FROM evidence WHERE evidence_id = ?").get(webBundle.evidence.evidence_id);
