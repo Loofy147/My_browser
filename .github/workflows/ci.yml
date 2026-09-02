@@ -17,7 +17,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-          cache: npm
 
       # The repository intentionally has no committed package-lock.json yet.
       # Generate the lock from the clean manifest twice and require identical
