@@ -22,7 +22,7 @@ test("raw artifact write rolls back with failed evidence transaction",()=>{
  assert.throws(()=>require("../src/evidence_store").persistRecord(db,{
    executionId:"exec-rollback",source:"fixture",adapter:"test",step:"row-1",
    data:{value:1},rawArtifact:refInput,rawMediaType:"text/plain",
-   verification:{method:"broken-verification",outcome:"unsupported",verifier:"test"}
+   relations:[{evidenceId:"wrong-source",relation:"supersedes",relatedEvidenceId:"ev:missing"}]
  }));
  const {prepareRawArtifact}=require("../src/artifact_store");
  const ref=prepareRawArtifact(refInput).artifactRef;
