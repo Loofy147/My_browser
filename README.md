@@ -91,3 +91,7 @@ Hashing demonstrates content integrity/identity, not source authenticity. A JSON
 ## Reproducibility status
 
 The repository does not yet contain a committed `package-lock.json`, so a fully clean `npm ci` reproduction gate remains open. CI is expected to be the final arbiter for the current branch; failures are not treated as successes merely because the local design is plausible.
+
+## Evidence retention
+
+Raw source bytes are retained by SHA-256 reference, and declared normalization transforms are recorded as lineage from raw artifact to Evidence. This does not prove source authenticity.
