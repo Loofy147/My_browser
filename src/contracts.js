@@ -140,6 +140,11 @@ function createProvenance({ evidenceId, sourceId, sourceUri = null, retrievedAt,
   };
 }
 
+function replayEvidenceIdentity({ executionId, step, data }) {
+  const observation = createObservation({ executionId, step, data, observedAt: "1970-01-01T00:00:00.000Z" });
+  return createEvidence({ observation }).evidence_id;
+}
+
 function getArtifactHash(evidence) {
   assertNonEmptyString(evidence.artifact_hash, "evidence.artifact_hash");
   return evidence.artifact_hash;
@@ -156,4 +161,5 @@ module.exports = {
   createVerification,
   createProvenance,
   getArtifactHash,
+  replayEvidenceIdentity,
 };
