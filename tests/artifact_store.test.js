@@ -15,3 +15,18 @@ test("raw artifact retention is content-addressed and byte-preserving",()=>{
  assert.equal(db.prepare("SELECT count(*) AS n FROM raw_artifacts").get().n,1);
  db.close();
 });
+
+test("raw artifact write rolls back with failed evidence transaction",()=>{
+ const db=openEvidenceDB();
+ const refInput=Buffer.from("rollback-me","utf8");
+ assert.throws(()=>require("../src/evidence_store").persistRecord(db,{
+   executionId:"exec-rollback",source:"fixture",adapter:"test",step:"row-1",
+   data:{value:1},rawArtifact:refInput,rawMediaType:"text/plain",
+   verification:{method:"broken-verification",outcome:"unsupported",verifier:"test"}
+ }));
+ const {prepareRawArtifact}=require("../src/artifact_store");
+ const ref=prepareRawArtifact(refInput).artifactRef;
+ assert.equal(db.prepare("SELECT count(*) AS n FROM raw_artifacts WHERE artifact_ref = ?").get(ref).n,0);
+ assert.equal(db.prepare("SELECT count(*) AS n FROM evidence WHERE execution_id = ?").get("exec-rollback").n,0);
+ db.close();
+});
