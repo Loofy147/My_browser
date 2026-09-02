@@ -148,10 +148,10 @@ function persistEvidenceBundle(db, { execution, observation, evidence, verificat
     }
     for (const relation of relations) {
       if (!relation || typeof relation !== "object") throw new TypeError("relation must be an object");
-      if (relation.evidenceId !== evidence.evidence_id) throw new Error("Relation source must be the persisted evidence");
+      if (!relation.relatedEvidenceId) throw new TypeError("relation.relatedEvidenceId is required");
       if (!["supersedes", "derived_from", "same_subject", "supports", "contradicts"].includes(relation.relation)) throw new TypeError("unsupported evidence relation");
       db.prepare("INSERT OR IGNORE INTO evidence_relations(evidence_id,relation,related_evidence_id) VALUES(?,?,?)")
-        .run(relation.evidenceId, relation.relation, relation.relatedEvidenceId);
+        .run(evidence.evidence_id, relation.relation, relation.relatedEvidenceId);
     }
     return { execution, observation, evidence, verification, provenance, relations };
   });
