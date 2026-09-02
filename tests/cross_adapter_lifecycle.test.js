@@ -27,7 +27,8 @@ function persistAdapterObservation(db, executionId, observation, adapter) {
     codeRevision: "test-revision",
     environmentDigest: "test-environment",
     requestId: executionId,
-    rawArtifactRef: "fixture:" + executionId,
+    rawArtifact: observation.source === "web" ? "<span data-subject-id=\"entity-1\" data-claim-type=\"status\">approved</span>" : observation.source === "pdf" ? "approved" : JSON.stringify({subject_id:"entity-1",claim_type:"status",value:"approved"}),
+    rawMediaType: observation.source === "web" ? "text/html" : "text/plain",
     transformId: "semantic-normalization:v1",
   });
 }
@@ -117,8 +118,15 @@ test("cross-adapter evidence lifecycle preserves semantic identity while separat
     assert.equal(provenance.code_revision, "test-revision");
     assert.equal(provenance.environment_digest, "test-environment");
     assert.equal(provenance.request_id, "exec-web");
-    assert.equal(provenance.raw_artifact_ref, "fixture:exec-web");
+    assert.match(provenance.raw_artifact_ref, /^sha256:[0-9a-f]{64}$/);
     assert.equal(provenance.transform_id, "semantic-normalization:v1");
+    const raw = db.prepare("SELECT artifact_ref, byte_length FROM raw_artifacts WHERE artifact_ref = ?").get(provenance.raw_artifact_ref);
+    assert.equal(raw.artifact_ref, provenance.raw_artifact_ref);
+    assert.equal(raw.byte_length > 0, true);
+    const transform = db.prepare("SELECT transform_id, transform_version, input_artifact_ref, output_evidence_id FROM evidence_transforms WHERE output_evidence_id = ?").get(webBundle.evidence.evidence_id);
+    assert.equal(transform.transform_id, "semantic-normalization:v1");
+    assert.equal(transform.input_artifact_ref, provenance.raw_artifact_ref);
+    assert.equal(transform.output_evidence_id, webBundle.evidence.evidence_id);
   } finally {
     db.close();
   }
