@@ -25,7 +25,7 @@ This record captures the state after the cross-source evidence-kernel gate was h
 
 ## Evidence boundary
 
-The current integration surface did not expose a workflow run for the latest commit after the CI change. Therefore CI success is not yet asserted here.
+The repository integration did not expose a workflow run for the latest CI changes at the time of this record. Therefore CI success is not asserted here.
 
 The local execution environment also cannot resolve external GitHub/registry hosts, so local clean-install or full CI reproduction cannot be truthfully reported from this environment.
 
