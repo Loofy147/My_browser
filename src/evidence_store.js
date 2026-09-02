@@ -1,6 +1,6 @@
 const { openDB, allRuns } = require("./db");
 const { createExecution, createObservation, createEvidence, createVerification, createProvenance, sha256Canonical } = require("./contracts");
-const { ensureArtifactSchema, storeRawArtifact } = require("./artifact_store");
+const { ensureArtifactSchema, prepareRawArtifact } = require("./artifact_store");
 
 function tableColumns(db, tableName) {
   return new Set(db.prepare(`PRAGMA table_info(${tableName})`).all().map((row) => row.name));
@@ -111,7 +111,7 @@ function withTransaction(db, work) {
   }
 }
 
-function persistEvidenceBundle(db, { execution, observation, evidence, verification = null, provenance = null, relations = [], transform = null }) {
+function persistEvidenceBundle(db, { execution, observation, evidence, verification = null, provenance = null, relations = [], transform = null, rawArtifact = null, rawMediaType = "application/octet-stream" }) {
   if (execution.execution_id !== observation.execution_id || observation.observation_id !== evidence.observation_id || observation.execution_id !== evidence.execution_id) {
     throw new Error("Evidence bundle relationship invariants violated");
   }
@@ -123,6 +123,11 @@ function persistEvidenceBundle(db, { execution, observation, evidence, verificat
   }
 
   return withTransaction(db, () => {
+    if (rawArtifact) {
+      const { bytes, artifactRef } = rawArtifact;
+      db.prepare("INSERT OR IGNORE INTO raw_artifacts(artifact_ref,content,media_type,byte_length,captured_at) VALUES(?,?,?,?,?)")
+        .run(artifactRef, bytes, rawMediaType, bytes.byteLength, evidence.captured_at);
+    }
     db.prepare("INSERT OR IGNORE INTO executions(execution_id,source,adapter,started_at,request_id,code_revision,environment_digest) VALUES(?,?,?,?,?,?,?)")
       .run(execution.execution_id, execution.source, execution.adapter, execution.started_at, execution.request_id, execution.code_revision, execution.environment_digest);
     db.prepare("INSERT OR IGNORE INTO observations(observation_id,execution_id,step,data,observed_at) VALUES(?,?,?,?,?)")
@@ -154,7 +159,8 @@ function persistEvidenceBundle(db, { execution, observation, evidence, verificat
 
 function persistRecord(db, { executionId, source, adapter, adapterVersion = "unknown", step, data, sourceUri = null, sourceId = source, retrievalMethod = null, verification = null, observedAt, requestId = null, codeRevision = null, environmentDigest = null, rawArtifactRef = null, rawArtifact = null, rawMediaType = "application/octet-stream", transformId = null, parentEvidenceId = null, relations = [] }) {
   const execution = createExecution({ executionId, source, adapter, startedAt: observedAt, requestId, codeRevision, environmentDigest });
-  const resolvedRawArtifactRef = rawArtifact === null ? rawArtifactRef : storeRawArtifact(db, { rawArtifact, mediaType: rawMediaType, capturedAt: observedAt || new Date().toISOString() });
+  const preparedRawArtifact = rawArtifact === null ? null : prepareRawArtifact(rawArtifact);
+  const resolvedRawArtifactRef = preparedRawArtifact ? preparedRawArtifact.artifactRef : rawArtifactRef;
   const artifactHash = sha256Canonical(data);
   const observation = createObservation({ executionId, step, data, observedAt });
   const evidence = createEvidence({ observation, sourceUri, retrievalMethod, parentEvidenceId });
@@ -197,7 +203,7 @@ function persistRecord(db, { executionId, source, adapter, adapterVersion = "unk
     description: "normalization by " + adapter,
     createdAt: observedAt || evidence.captured_at
   } : null;
-  return persistEvidenceBundle(db, { execution, observation, evidence, verification: normalizedVerification, provenance, relations, transform });
+  return persistEvidenceBundle(db, { execution, observation, evidence, verification: normalizedVerification, provenance, relations, transform, rawArtifact: preparedRawArtifact, rawMediaType });
 }
 
 function migrateLegacyRuns(db) {
