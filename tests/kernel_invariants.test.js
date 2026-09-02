@@ -91,7 +91,9 @@ test("provenance captures adapter identity and execution context", async () => {
       codeRevision: "git:abc123",
       environmentDigest: "sha256:env",
       rawArtifactRef: "artifact://raw/42",
-      transformId: "web-semantic-v1"
+      rawArtifact: "<div data-subject-id=\"company-42\" data-claim-type=\"status\">active</div>",
+    rawMediaType: "text/html",
+    transformId: "web-semantic-v1"
     });
     const row = db.prepare("SELECT * FROM evidence_provenance WHERE evidence_id=?").get(result.evidence.evidence_id);
     assert.equal(row.adapter_id, webAdapter.id);
