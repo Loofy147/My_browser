@@ -14,28 +14,35 @@ This record captures the state after the cross-source evidence-kernel gate was h
 - Identity replay is explicitly treated as a separate invariant from source-to-output transformation replay.
 - Recent tests cover cross-adapter lifecycle behavior, raw artifact retention/rollback, transform lineage, and deterministic replay.
 
-## Corrections made in this stage
+## Gate result
 
-1. `docs/KERNEL_EXPERIMENT.md` was reconciled with the implemented raw-artifact and replay model.
-2. The experiment now states explicitly that source authenticity is not proved by content hashing.
-3. The experiment now distinguishes committed-lock reproducibility, manifest-level clean-run reproducibility, and execution reproducibility.
-4. CI was changed to generate a lockfile twice from the clean manifest, require byte-identical lockfiles, then run `npm ci` against that generated lockfile.
-5. The double `npm start` execution is documented as an explicit idempotency exercise rather than an unexplained duplicate step.
-6. `docs/REPRODUCIBILITY.md` records the remaining distinction: no committed `package-lock.json` means committed-lock reproducibility remains OPEN.
+The GitHub Actions CI run for commit `8b523854db0362d0372231cbf3537401c74b3ee8` passed on both Node 22.x and Node 24.x.
+
+For both matrix jobs, the following completed successfully:
+
+- clean checkout;
+- Node setup;
+- deterministic lockfile generation twice from the manifest with byte-identical results;
+- `npm ci --ignore-scripts`;
+- complete test suite: 19 tests passed, 0 failed;
+- two consecutive `npm start` executions with matching canonical/dashboard counts;
+- generated dashboard and SQLite database existence checks.
+
+This closes the current cross-source kernel acceptance gate for the tested scope.
 
 ## Evidence boundary
 
-The repository integration did not expose a workflow run for the latest CI changes at the time of this record. Therefore CI success is not asserted here.
+The gate result proves the tested repository behavior on GitHub Actions for Node 22.x and Node 24.x. It does not create claims beyond the fixtures and invariants actually exercised.
 
-The local execution environment also cannot resolve external GitHub/registry hosts, so local clean-install or full CI reproduction cannot be truthfully reported from this environment.
+The local execution environment still cannot resolve external GitHub/registry hosts, so local clean-install or CI reproduction is not asserted from the local environment.
 
 ## Decision
 
-**Status: OPEN / EXPERIMENTAL.**
+**Status: GATE PASSED / INTERNAL CAPABILITY CANDIDATE.**
 
-Do not add new adapters or product features until the CI gate is externally observed passing on Node 22 and Node 24.
+The kernel abstraction survived the current acceptance gate without requiring source-specific semantic exceptions. Do not turn it into a browser product or generic scraping product on the basis of this result.
 
-After a successful CI run, evaluate whether the kernel invariants hold without source-specific semantic exceptions. If they do, the next experiment should be a small number of additional source shapes and a measurement of decision/research value. If they do not, re-scope the abstraction before expanding it.
+The next controlled experiment is limited to a small number of additional source shapes and, more importantly, measurement of whether canonical Evidence materially improves research, verification, or decision workflows. Additional implementation should be justified by observed downstream value, not by feature completeness.
 
 ## Non-claims
 
