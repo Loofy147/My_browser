@@ -26,7 +26,7 @@ Source
 
 The cross-source kernel acceptance gate passed on GitHub Actions for Node 22.x and Node 24.x.
 
-Observed CI evidence for commit `8b523854db0362d0372231cbf3537401c74b3ee8`:
+Observed CI evidence for commit `8b523854db0362d0372231cbf3537401c74b3ee8` in run `33679026934`:
 
 - deterministic lockfile generation twice from the clean manifest;
 - byte-identical generated lockfiles;
