@@ -22,19 +22,26 @@ Source
   -> Provenance / History
 ```
 
-## Current result
+## Gate result
 
-The repository has an explicit adapter contract and three semantic adapter probes. They normalize a shared observation shape:
+The cross-source kernel acceptance gate passed on GitHub Actions for Node 22.x and Node 24.x.
 
-```text
-subject_id
-claim_type
-value
-```
+Observed CI evidence for commit `8b523854db0362d0372231cbf3537401c74b3ee8`:
 
-The tests verify equivalent semantic payloads across the three probes while retaining source-specific provenance. Raw source bytes can also be retained by content hash and linked to normalized Evidence through provenance and transformation lineage.
+- deterministic lockfile generation twice from the clean manifest;
+- byte-identical generated lockfiles;
+- successful `npm ci --ignore-scripts`;
+- complete test suite: 19 passed, 0 failed;
+- two consecutive `npm start` executions succeeded with matching canonical/dashboard counts;
+- generated dashboard and SQLite database checks succeeded.
 
-This is evidence for an architectural hypothesis, not a product claim.
+This closes the current gate for the tested scope. It does not establish source authenticity, production browser capability, customer demand, or a commercial wedge.
+
+## Current hypothesis
+
+Different external source adapters can share one strict lifecycle — acquisition, observation, evidence, verification, provenance, and history — without source-specific semantics leaking into the kernel.
+
+The hypothesis survived the current acceptance gate for the tested scope. It remains falsifiable as additional source shapes and downstream use cases are introduced.
 
 ## Kernel invariants
 
@@ -92,7 +99,7 @@ A valid replay reproduces the same normalized artifact hash for the same raw byt
 
 ### K12 — Identity replay is distinct
 
-Canonical identity replay reconstructs the expected Evidence ID from `execution + step + normalized observation`. It validates the identity contract; it does **not** by itself prove that the raw source can be re-transformed. Raw-input transformation replay is the stronger source-to-output reproducibility check.
+Canonical identity replay reconstructs the expected Evidence ID from `execution + step + normalized observation`. It validates the identity contract; it does **not** by itself prove that the raw source can be re-transformed. Raw-input transformation replay is the source-to-output reproducibility check.
 
 ## What this experiment does NOT prove
 
@@ -106,29 +113,27 @@ Canonical identity replay reconstructs the expected Evidence ID from `execution 
 
 ## Reproducibility status
 
-Installation and execution reproducibility are tracked separately. The repository does not yet contain a committed `package-lock.json`; therefore **committed-lock reproducibility is OPEN**.
+Installation and execution reproducibility are tracked separately.
 
-CI currently performs a clean lock generation followed by `npm ci`, then runs the tests and explicit repeated-start idempotency check. This validates clean-run dependency resolution plus the ability to consume the resolved lock, but it must not be described as committed-lock reproducibility.
+- **Manifest-level clean-run reproducibility:** demonstrated in CI.
+- **Execution reproducibility:** demonstrated for the declared transform replay contract.
+- **Committed-lock reproducibility:** not claimed because `package-lock.json` is not committed.
 
-For the execution layer, automated tests cover raw-byte transform replay, normalized artifact determinism, lineage, and canonical Evidence identity reconstruction.
+CI therefore proves that a clean runner can resolve the manifest deterministically for the tested state and then perform `npm ci` against that generated lockfile. It does not prove committed-lock reproducibility.
 
-## Acceptance gate for the next milestone
+## Next controlled experiment
 
-The kernel hypothesis advances only when all of the following are demonstrated by automated tests and a successful clean CI run:
+Do not expand into a browser or generic scraping product.
 
-1. Clean installation is deterministic at the manifest level, and `npm ci` succeeds from the generated lockfile.
-2. The complete test suite passes on supported Node versions.
-3. Repeating the same acquisition is idempotent.
-4. Mutating source bytes changes the raw artifact reference and, when normalization changes, the normalized artifact/Evidence identity.
-5. The same semantic payload across Web/PDF/GitHub has the same canonical artifact hash.
-6. Different execution contexts retain distinct Evidence identities for equal normalized content.
-7. A verification record can be added without mutating Evidence.
-8. Foreign-key violations fail closed.
-9. Raw bytes are retained and byte-retrievable by their content hash.
-10. Transformation lineage links raw inputs to normalized Evidence outputs.
-11. Replay from raw bytes plus a declared transform version reproduces the normalized artifact hash.
-12. Changing transform version is represented as a distinct transformation lineage and, when output changes, a distinct normalized artifact/Evidence identity.
-13. Identity replay and transformation replay remain explicitly distinct.
-14. Provenance fields remain source-specific but contract-compatible.
+The next experiment should introduce only a small number of additional source shapes and measure downstream value:
 
-The hypothesis remains **OPEN** unless this gate is satisfied without source-specific semantic exceptions. If satisfying the gate requires increasing source-specific exceptions, the kernel abstraction should be re-scoped or killed rather than expanded into a feature-heavy browser product.
+```text
+Source
+  -> Adapter
+  -> Canonical Evidence
+  -> Verification / Relations
+  -> Research or Decision Workflow
+  -> Measurable Outcome
+```
+
+Capability expansion must follow demonstrated downstream value. If additional source types require growing source-specific semantic exceptions, re-scope the kernel rather than accumulating exceptions.
