@@ -16,15 +16,15 @@ This record captures the state after the cross-source evidence-kernel gate was h
 
 ## Gate result
 
-The GitHub Actions CI run for commit `8b523854db0362d0372231cbf3537401c74b3ee8` passed on both Node 22.x and Node 24.x.
+The GitHub Actions CI run `33679026934` for commit `8b523854db0362d0372231cbf3537401c74b3ee8` passed on both Node 22.x and Node 24.x.
 
 For both matrix jobs, the following completed successfully:
 
 - clean checkout;
 - Node setup;
-- deterministic lockfile generation twice from the manifest with byte-identical results;
+- deterministic lockfile generation twice from the clean manifest, with byte-identical results;
 - `npm ci --ignore-scripts`;
-- complete test suite: 19 tests passed, 0 failed;
+- complete test suite: 19 passed, 0 failed;
 - two consecutive `npm start` executions with matching canonical/dashboard counts;
 - generated dashboard and SQLite database existence checks.
 
